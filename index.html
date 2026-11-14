@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BizPulse – Stock, Payments &amp; Profit Tracker</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#141a2e;--mu:#667089;--bd:#e3e7f1;--ac:#4f46e5;--ac2:#7c3aed;--ok:#059669;--wn:#d97706;--er:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1120;--card:#161b30;--tx:#eef0fa;--mu:#98a1bf;--bd:#262d4a;--ac:#818cf8;--ac2:#a78bfa;--ok:#34d399;--wn:#fbbf24;--er:#f87171;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1120;--card:#161b30;--tx:#eef0fa;--mu:#98a1bf;--bd:#262d4a;--ac:#818cf8;--ac2:#a78bfa;--ok:#34d399;--wn:#fbbf24;--er:#f87171;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(120deg,var(--ac),var(--ac2));color:#fff;padding:16px 18px 0}
+header h1{margin:0;font-size:20px}header p{margin:2px 0 10px;opacity:.85;font-size:12px}
+nav{display:flex;gap:4px;overflow-x:auto}nav button{background:transparent;border:0;color:#fff;opacity:.75;padding:9px 14px;font:600 13px inherit;cursor:pointer;border-radius:8px 8px 0 0;white-space:nowrap}
+nav button.on{background:var(--bg);color:var(--ac);opacity:1}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.kpi small{color:var(--mu);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em}.kpi b{font-size:21px}
+.ok{color:var(--ok)}.wn{color:var(--wn)}.er{color:var(--er)}
+h2{font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+label{font-size:11px;color:var(--mu);display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px}
+input,select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px;font:inherit;width:100%}
+button.b{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:9px 14px;font:600 13px inherit;cursor:pointer}
+button.g{background:transparent;color:var(--mu);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:520px}
+th{text-align:left;font-size:11px;color:var(--mu);text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--bd)}td{padding:8px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;background:color-mix(in srgb,currentColor 14%,transparent)}
+.cd{text-align:center;min-width:76px}.cd b{font-size:22px;display:block;line-height:1}.cd small{font-size:10px;color:var(--mu)}
+.bar{height:6px;background:var(--bd);border-radius:9px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--ok)}
+.cols{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;display:none;z-index:9}
+.mu{color:var(--mu)}.empty{padding:18px;text-align:center;color:var(--mu)}
+</style></head><body>
+<header><h1>BizPulse</h1><p>Stock · Purchases · Customer payments · Profit analytics</p>
+<nav id="nav"></nav></header>
+<main id="v"></main><div id="toast"></div>
+<script>
+const TABS=[["dash","Dashboard"],["stock","Stock"],["buy","Purchases"],["sell","Orders"],["recv","Receivables"],["data","Settings"]];
+let tab="dash",S={items:[],purchases:[],orders:[],term:90,warn:15};
+try{const r=localStorage.getItem("bizpulse");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem("bizpulse",JSON.stringify(S))}catch(e){}};
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9);
+const money=n=>(n<0?"-":"")+"₹"+Math.abs(Number(n)||0).toLocaleString("en-IN",{maximumFractionDigits:0});
+const today=()=>new Date().toISOString().slice(0,10);
+const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const dLeft=d=>Math.round((new Date(d)-new Date(today()))/864e5);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",2600)}
+const oTotal=o=>o.lines.reduce((a,l)=>a+l.qty*l.price,0),oPaid=o=>o.pays.reduce((a,p)=>a+p.a,0);
+const oDue=o=>addD(o.date,o.term);
+const item=id=>S.items.find(i=>i.id==id);
+function calc(){
+ const m={};S.items.forEach(i=>m[i.id]={i,bq:0,bc:0,sq:0,rev:0,last:0});
+ S.purchases.forEach(p=>{const x=m[p.item];if(x){x.bq+=p.qty;x.bc+=p.qty*p.cost}});
+ S.orders.forEach(o=>o.lines.forEach(l=>{const x=m[l.item];if(x){x.sq+=l.qty;x.rev+=l.qty*l.price;x.last=l.price}}));
+ let T={inv:0,paidSup:0,sales:0,cogs:0,stockVal:0,coll:0,recv:0,over:0,soon:[]};
+ Object.values(m).forEach(x=>{x.avg=x.bq?x.bc/x.bq:0;x.stock=x.bq-x.sq;x.val=x.stock*x.avg;x.cogs=x.sq*x.avg;x.profit=x.rev-x.cogs;T.stockVal+=x.val;T.cogs+=x.cogs;T.sales+=x.rev});
+ S.purchases.forEach(p=>{T.inv+=p.qty*p.cost;T.paidSup+=p.paid});
+ S.orders.forEach(o=>{const out=oTotal(o)-oPaid(o);T.coll+=oPaid(o);if(out>0.5){T.recv+=out;const d=dLeft(oDue(o));if(d<0)T.over+=out;if(d<=S.warn)T.soon.push(o)}});
+ T.profit=T.sales-T.cogs;T.margin=T.sales?T.profit/T.sales*100:0;T.payable=T.inv-T.paidSup;T.cash=T.coll-T.paidSup;
+ T.roi=T.inv?T.profit/T.inv*100:0;T.aov=S.orders.length?T.sales/S.orders.length:0;
+ return {m,T}}
+function status(o){const out=oTotal(o)-oPaid(o);if(out<=0.5)return['<span class="pill ok">Paid</span>',"✓","settled","ok"];
+ const d=dLeft(oDue(o));if(d<0)return['<span class="pill er">Overdue</span>',-d,"days late","er"];
+ if(d<=S.warn)return['<span class="pill wn">Due soon</span>',d,"days left","wn"];return['<span class="pill ok">On track</span>',d,"days left","ok"]}
+function bars(){const mo=[];const d=new Date();d.setDate(1);for(let i=5;i>=0;i--){const x=new Date(d);x.setMonth(d.getMonth()-i);mo.push(x.toISOString().slice(0,7))}
+ const s=mo.map(k=>S.orders.filter(o=>o.date.startsWith(k)).reduce((a,o)=>a+oTotal(o),0)),b=mo.map(k=>S.purchases.filter(p=>p.date.startsWith(k)).reduce((a,p)=>a+p.qty*p.cost,0));
+ const mx=Math.max(1,...s,...b);let g="";mo.forEach((k,i)=>{const x=20+i*95,h1=s[i]/mx*130,h2=b[i]/mx*130;
+ g+=`<rect x="${x}" y="${150-h1}" width="30" height="${h1}" rx="3" fill="var(--ok)"/><rect x="${x+34}" y="${150-h2}" width="30" height="${h2}" rx="3" fill="var(--ac)"/><text x="${x+32}" y="168" text-anchor="middle" font-size="11" fill="var(--mu)">${k.slice(5)}/${k.slice(2,4)}</text>`});
+ return `<svg viewBox="0 0 600 176" width="100%"><line x1="10" x2="590" y1="150" y2="150" stroke="var(--bd)"/>${g}</svg><div class="mu" style="font-size:12px"><span class="ok">■</span> Sales &nbsp;<span style="color:var(--ac)">■</span> Purchases (last 6 months)</div>`}
+const K=(l,v,c="")=>`<div class="card kpi"><small>${l}</small><b class="${c}">${v}</b></div>`;
+function dash(){const{m,T}=calc();const top=Object.values(m).filter(x=>x.sq).sort((a,b)=>b.profit-a.profit).slice(0,5);
+ const cu={};S.orders.forEach(o=>{const out=oTotal(o)-oPaid(o);if(out>0.5)cu[o.cust]=(cu[o.cust]||0)+out});
+ const cl=Object.entries(cu).sort((a,b)=>b[1]-a[1]).slice(0,5);
+ return `<div class="grid">${K("Total invested",money(T.inv))}${K("Sales revenue",money(T.sales))}${K("Cost of goods sold",money(T.cogs))}${K("Gross profit",money(T.profit),T.profit>=0?"ok":"er")}
+ ${K("Profit margin",T.margin.toFixed(1)+"%")}${K("ROI on investment",T.roi.toFixed(1)+"%")}${K("Stock value (at cost)",money(T.stockVal))}${K("To receive",money(T.recv),"wn")}
+ ${K("Overdue",money(T.over),T.over?"er":"")}${K("Collected so far",money(T.coll),"ok")}${K("Owed to suppliers",money(T.payable))}${K("Net cash position",money(T.cash),T.cash>=0?"ok":"er")}
+ ${K("Orders",S.orders.length)}${K("Avg order value",money(T.aov))}</div>
+ <div class="card"><h2>🔔 Payment reminders</h2>${T.soon.length?T.soon.sort((a,b)=>oDue(a)<oDue(b)?-1:1).map(o=>{const s=status(o);return `<div class="row" style="padding:6px 0;border-bottom:1px solid var(--bd)"><b style="flex:2">${esc(o.cust)}</b><span style="flex:1">${money(oTotal(o)-oPaid(o))}</span><span style="flex:1">${s[0]} <span class="mu">${s[1]} ${s[2]}</span></span></div>`}).join(""):'<div class="empty">No payments due in the next '+S.warn+" days 🎉</div>"}</div>
+ <div class="cols"><div class="card"><h2>Sales vs purchases</h2>${bars()}</div>
+ <div class="card"><h2>Top items by profit</h2>${top.length?top.map(x=>`<div class="row" style="justify-content:space-between"><span>${esc(x.i.name)}</span><b class="${x.profit>=0?"ok":"er"}">${money(x.profit)}</b></div>`).join(""):'<div class="empty">No sales yet</div>'}
+ <h2 style="margin-top:14px">Biggest pending customers</h2>${cl.length?cl.map(c=>`<div class="row" style="justify-content:space-between"><span>${esc(c[0])}</span><b class="wn">${money(c[1])}</b></div>`).join(""):'<div class="empty">Nothing pending</div>'}</div></div>`}
+function stock(){const{m}=calc();const r=Object.values(m);
+ return `<div class="card tw"><h2>Current inventory</h2>${r.length?`<table><tr><th>Item</th><th>In stock</th><th>Bought</th><th>Sold</th><th>Avg cost</th><th>Stock value</th><th>Revenue</th><th>Profit</th></tr>${r.map(x=>`<tr><td><b>${esc(x.i.name)}</b></td><td><span class="pill ${x.stock<=0?"er":x.stock<=(x.bq*.15)?"wn":"ok"}">${x.stock}</span></td><td>${x.bq}</td><td>${x.sq}</td><td>${money(x.avg)}</td><td>${money(x.val)}</td><td>${money(x.rev)}</td><td class="${x.profit>=0?"ok":"er"}">${money(x.profit)}</td></tr>`).join("")}</table>`:'<div class="empty">No items yet. Record a purchase to add stock.</div>'}</div>`}
+function buy(){return `<div class="card"><h2>➕ Record purchase</h2><div class="row">
+ <label>Date<input id="pd" type="date" value="${today()}"></label><label>Item<input id="pi" list="il" placeholder="Type or pick"><datalist id="il">${S.items.map(i=>`<option value="${esc(i.name)}">`).join("")}</datalist></label>
+ <label>Quantity<input id="pq" type="number" min="0"></label><label>Cost per unit (₹)<input id="pc" type="number" min="0"></label>
+ <label>Supplier<input id="ps"></label><label>Paid now (₹)<input id="pp" type="number" min="0" value="0"></label><button class="b" onclick="addBuy()">Add purchase</button></div></div>
+ <div class="card tw"><h2>Purchase history</h2>${S.purchases.length?`<table><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>Supplier</th><th>Paid</th><th></th></tr>${[...S.purchases].reverse().map(p=>{const t=p.qty*p.cost,o=t-p.paid;return `<tr><td>${p.date}</td><td>${esc(item(p.item)?.name||"?")}</td><td>${p.qty}</td><td>${money(p.cost)}</td><td>${money(t)}</td><td>${esc(p.sup||"-")}</td><td>${money(p.paid)} ${o>0.5?`<span class="pill wn">${money(o)} due</span>`:""}</td><td style="white-space:nowrap">${o>0.5?`<input id="sp${p.id}" type="number" placeholder="Pay" style="width:70px"> <button class="g" onclick="payBuy('${p.id}')">Pay</button> `:""}<button class="g" onclick="delBuy('${p.id}')">✕</button></td></tr>`}).join("")}</table>`:'<div class="empty">No purchases recorded</div>'}</div>`}
+function addBuy(){const n=$("#pi").value.trim(),q=+$("#pq").value,c=+$("#pc").value;if(!n||q<=0||c<0||$("#pc").value==="")return toast("Enter item, quantity and cost");
+ let it=S.items.find(i=>i.name.toLowerCase()==n.toLowerCase());if(!it){it={id:uid(),name:n};S.items.push(it)}
+ S.purchases.push({id:uid(),date:$("#pd").value||today(),item:it.id,qty:q,cost:c,sup:$("#ps").value.trim(),paid:Math.min(+$("#pp").value||0,q*c)});save();toast("Purchase added · stock updated");render()}
+function payBuy(id){const p=S.purchases.find(x=>x.id==id),a=+$("#sp"+id).value;if(a<=0)return;p.paid=Math.min(p.qty*p.cost,p.paid+a);save();render()}
+function delBuy(id){const p=S.purchases.find(x=>x.id==id);const{m}=calc();if(m[p.item].stock<p.qty)return toast("Can’t delete: this stock was already sold");S.purchases=S.purchases.filter(x=>x.id!=id);save();render()}
+function lineRow(){const d=document.createElement("div");d.className="row ln";d.style.marginBottom="6px";
+ d.innerHTML=`<label>Item<select onchange="pick(this)"><option value="">Select…</option>${S.items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join("")}</select></label><label>Qty<input class="q" type="number" min="0"></label><label>Price/unit (₹)<input class="p" type="number" min="0"></label><span class="mu hint" style="min-width:90px"></span><button class="g" onclick="this.parentNode.remove()">✕</button>`;$("#lines").appendChild(d)}
+function pick(s){const r=s.closest(".ln"),{m}=calc(),x=m[s.value];if(!x)return;r.querySelector(".hint").textContent="Stock: "+x.stock;r.querySelector(".p").value=x.last||Math.round(x.avg*1.2)}
+function sell(){return `<div class="card"><h2>🧾 New customer order (fulfilled)</h2><div class="row">
+ <label>Date<input id="od" type="date" value="${today()}"></label><label>Customer<input id="oc" list="cl" placeholder="Type or pick"><datalist id="cl">${[...new Set(S.orders.map(o=>o.cust))].map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
+ <label>Payment term (days)<input id="ot" type="number" value="${S.term}"></label><label>Received now (₹)<input id="op" type="number" value="0"></label></div>
+ <div id="lines" style="margin-top:10px"></div><div class="row" style="margin-top:6px"><button class="g" onclick="lineRow()">+ Add item</button><button class="b" onclick="addSell()">Fulfil order &amp; update stock</button></div></div>
+ <div class="card tw"><h2>Order history</h2>${S.orders.length?`<table><tr><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Received</th><th>Due date</th><th>Status</th><th></th></tr>${[...S.orders].reverse().map(o=>`<tr><td>${o.date}</td><td>${esc(o.cust)}</td><td>${o.lines.map(l=>esc(item(l.item)?.name||"?")+" ×"+l.qty).join(", ")}</td><td>${money(oTotal(o))}</td><td>${money(oPaid(o))}</td><td>${oDue(o)}</td><td>${status(o)[0]}</td><td><button class="g" onclick="delSell('${o.id}')">✕</button></td></tr>`).join("")}</table>`:'<div class="empty">No orders yet</div>'}</div>`}
+function addSell(){const c=$("#oc").value.trim();if(!c)return toast("Enter customer name");const{m}=calc(),need={},lines=[];
+ for(const r of document.querySelectorAll(".ln")){const id=r.querySelector("select").value,q=+r.querySelector(".q").value,p=+r.querySelector(".p").value;if(!id||q<=0)continue;need[id]=(need[id]||0)+q;lines.push({item:id,qty:q,price:p})}
+ if(!lines.length)return toast("Add at least one item");for(const id in need)if(need[id]>m[id].stock)return toast("Not enough stock for "+m[id].i.name+" (have "+m[id].stock+")");
+ const o={id:uid(),date:$("#od").value||today(),cust:c,term:+$("#ot").value||S.term,lines,pays:[]};const r=Math.min(+$("#op").value||0,oTotal(o));if(r>0)o.pays.push({d:o.date,a:r});
+ S.orders.push(o);save();toast("Order recorded · inventory & receivables updated");render()}
+function delSell(id){S.orders=S.orders.filter(o=>o.id!=id);save();toast("Order removed · stock restored");render()}
+function recv(){const open=S.orders.filter(o=>oTotal(o)-oPaid(o)>0.5).sort((a,b)=>oDue(a)<oDue(b)?-1:1);const cu={};
+ S.orders.forEach(o=>{const c=cu[o.cust]=cu[o.cust]||{t:0,p:0,n:0};c.t+=oTotal(o);c.p+=oPaid(o);c.n++});
+ const rows=Object.entries(cu).sort((a,b)=>(b[1].t-b[1].p)-(a[1].t-a[1].p));
+ return `<div class="card tw"><h2>Customers – how much to collect</h2>${rows.length?`<table><tr><th>Customer</th><th>Orders</th><th>Billed</th><th>Received</th><th>Outstanding</th></tr>${rows.map(([n,c])=>`<tr><td><b>${esc(n)}</b></td><td>${c.n}</td><td>${money(c.t)}</td><td class="ok">${money(c.p)}</td><td class="${c.t-c.p>0.5?"wn":""}"><b>${money(c.t-c.p)}</b></td></tr>`).join("")}</table>`:'<div class="empty">No customers yet</div>'}</div>
+ <h2>⏳ Payment countdown</h2>${open.length?open.map(o=>{const s=status(o),t=oTotal(o),p=oPaid(o);return `<div class="card"><div class="row" style="align-items:center"><div class="cd ${s[3]}"><b>${s[1]}</b><small>${s[2]}</small></div>
+ <div style="flex:3;min-width:200px"><b>${esc(o.cust)}</b> ${s[0]}<div class="mu">${o.lines.map(l=>esc(item(l.item)?.name||"?")+" ×"+l.qty).join(", ")}</div><div class="mu">Sold ${o.date} · Due ${oDue(o)} · ${o.term}-day terms</div>
+ <div class="bar"><i style="width:${p/t*100}%"></i></div><div style="font-size:12px">${money(p)} of ${money(t)} received · <b>${money(t-p)} pending</b></div></div>
+ <div class="row" style="flex:1;min-width:170px"><input id="rp${o.id}" type="number" placeholder="Amount (₹)" style="flex:1"><button class="b" onclick="recvPay('${o.id}')">Receive</button></div></div></div>`}).join(""):'<div class="card empty">All payments collected ✅</div>'}`}
+function recvPay(id){const o=S.orders.find(x=>x.id==id),a=+$("#rp"+id).value;if(a<=0)return toast("Enter amount");o.pays.push({d:today(),a:Math.min(a,oTotal(o)-oPaid(o))});save();toast("Payment recorded");render()}
+function data(){return `<div class="card"><h2>Settings</h2><div class="row"><label>Default payment term (days)<input id="st" type="number" value="${S.term}"></label><label>Warn me before due (days)<input id="sw" type="number" value="${S.warn}"></label><button class="b" onclick="S.term=+$('#st').value||90;S.warn=+$('#sw').value||15;save();toast('Saved');render()">Save</button></div></div>
+ <div class="card"><h2>Backup &amp; restore</h2><p class="mu">Data is saved in this browser only. Download a backup regularly, and restore it on any device.</p><div class="row"><button class="b" onclick="exp()">Download backup</button><label>Restore backup<input type="file" accept=".json" onchange="imp(this)"></label><button class="g" onclick="if(confirm('Erase all data?')){S={items:[],purchases:[],orders:[],term:90,warn:15};save();render()}">Erase all</button></div></div>`}
+function exp(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="bizpulse-backup-"+today()+".json";a.click()}
+function imp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{S=Object.assign(S,JSON.parse(r.result));save();toast("Backup restored");render()}catch(e){toast("Invalid file")}};r.readAsText(f)}
+function render(){$("#nav").innerHTML=TABS.map(t=>`<button class="${t[0]==tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("");
+ $("#v").innerHTML=({dash,stock,buy,sell,recv,data})[tab]();if(tab=="sell")lineRow()}
+render();
+</script></body></html>
