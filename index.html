@@ -44,8 +44,7 @@ const TABS=[["dash","Dashboard"],["stock","Stock"],["buy","Purchases"],["sell","
 let tab="dash",S={items:[],purchases:[],orders:[],term:90,warn:15};
 try{const r=localStorage.getItem("bizpulse");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 /* ===== CLOUD SYNC (Supabase) – paste your two values below ===== */
-const CFG={url:"https://epevmdatzhtjwrhdgnoi.supabase.co",key:"sb_publishable_vbH6twJzds4PAqaZiIHUXg_e8N02USz
-"};
+const CFG={url:"https://epevmdatzhtjwrhdgnoi.supabase.co",key:"sb_publishable_vbH6twJzds4PAqaZiIHUXg_e8N02USz"};
 let auth=null,pushT=null,dirty=false;
 try{auth=JSON.parse(localStorage.getItem("bizauth")||"null")}catch(e){}
 const cloud=()=>/^https:/.test(CFG.url)&&CFG.key.length>20;
